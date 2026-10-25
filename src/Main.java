@@ -3,7 +3,7 @@ import java.util.Scanner;
 /**
  * Interactive CLI & Test Harness for the Elevator Door Assembly.
  * Connects directly to DoorTwin in Phase 2 for interactive hardware verification,
- * featuring real-time ASCII visualization of the center-opening sliding doors.
+ * featuring real-time 7-line ASCII visualization of the center-opening sliding doors.
  */
 public class Main {
 
@@ -78,7 +78,7 @@ public class Main {
 
     private static void printMenu(DoorTwin door) {
         System.out.println("--------------------------------------------------");
-        System.out.println("  Door Visual: " + door.toAscii());
+        System.out.println(door.toAscii());
         System.out.println("--------------------------------------------------");
         System.out.println(" [1] open()          - Command door leaves to slide open");
         System.out.println(" [2] close()         - Command door leaves to slide shut");
@@ -89,16 +89,22 @@ public class Main {
     }
 
     private static void animateDoor(DoorTwin door) {
-        // Poll dynamically while door is actively moving
+        boolean first = true;
         while (door.getState() == DoorTwin.State.OPENING || door.getState() == DoorTwin.State.CLOSING) {
-            System.out.print("\r  Visual: " + door.toAscii() + "   ");
+            if (!first) {
+                System.out.print("\033[7A\r");
+            }
+            System.out.println(door.toAscii());
+            first = false;
             try {
                 Thread.sleep(100);
             } catch (InterruptedException ignored) {
                 break;
             }
         }
-        // Print the final resting state and advance line
-        System.out.println("\r  Visual: " + door.toAscii() + "   ");
+        if (!first) {
+            System.out.print("\033[7A\r");
+        }
+        System.out.println(door.toAscii());
     }
 }

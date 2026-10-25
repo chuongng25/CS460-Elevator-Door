@@ -1,7 +1,7 @@
 /**
  * Digital Twin: Hardware simulation and physical door logic.
- * Models a center-opening sliding door with real-time kinematic updates
- * and automatic safety reversal when obstructed.
+ * Models a center-opening sliding door with real-time kinematic updates,
+ * realistic 7-line ASCII doorway visualization, and automatic safety reversal.
  */
 public class DoorTwin implements DoorApi {
 
@@ -9,6 +9,7 @@ public class DoorTwin implements DoorApi {
 
     public static final int DEFAULT_PORT = 5556;
     public static final double DEFAULT_DURATION_SEC = 2.0;
+    private static final int LEAF_WIDTH = 14;
 
     private final double durationSec;
     private State state = State.CLOSED;
@@ -56,7 +57,6 @@ public class DoorTwin implements DoorApi {
 
     /**
      * Advances door kinematics by time step dt seconds.
-     * Core real-time engine: handles continuous movement and safety reversal.
      */
     public synchronized void update(double dt) {
         if (state == State.OPENING) {
@@ -107,9 +107,6 @@ public class DoorTwin implements DoorApi {
         return obstruction;
     }
 
-    /**
-     * Sets obstruction sensor state. Triggers instant safety reversal if closing.
-     */
     public synchronized void setObstruction(boolean blocked) {
         this.obstruction = blocked;
         if (blocked && state == State.CLOSING) {
@@ -126,25 +123,38 @@ public class DoorTwin implements DoorApi {
     }
 
     /**
-     * Renders a real-time ASCII text visual of the 2-leaf center-opening sliding door.
+     * Renders a 7-line realistic ASCII text visual of the center-opening elevator doorway.
      */
     public synchronized String toAscii() {
-        int w = 12;
-        int closedW = (int) Math.round((1.0 - position) * w);
-        int openW = w - closedW;
-        StringBuilder sb = new StringBuilder();
-        sb.append("[");
-        // Left sliding leaf (retreats to the left)
-        for (int i = 0; i < closedW; i++) sb.append("█");
-        for (int i = 0; i < openW; i++) sb.append(" ");
-        sb.append(" | ");
-        // Right sliding leaf (retreats to the right)
-        for (int i = 0; i < openW; i++) sb.append(" ");
-        for (int i = 0; i < closedW; i++) sb.append("█");
-        sb.append("] ");
-        sb.append(String.format("%3.0f%% [%s]", position * 100, state));
-        if (obstruction) {
-            sb.append(" (OBSTRUCTION DETECTED!)");
+        int closedW = (int) Math.round((1.0 - position) * LEAF_WIDTH);
+        int openW = LEAF_WIDTH - closedW;
+
+        String doorL = repeat('█', closedW) + repeat(' ', openW);
+        String doorR = repeat(' ', openW) + repeat('█', closedW);
+
+        char inChar = obstruction ? '·' : '░';
+        String inL = repeat('█', closedW) + repeat(inChar, openW);
+        String inR = repeat(inChar, openW) + repeat('█', closedW);
+
+        String status = String.format("State: %-8s (%3.0f%%)", state, position * 100);
+        String sensor = obstruction ? "⚠️ SENSOR: BLOCKED" : "SENSOR: CLEAR";
+
+        return String.join("\n",
+            "  ╔════════════════╤════════════════╗  [ ▲ 1F ] " + status,
+            "  ║ " + doorL + " │ " + doorR + " ║",
+            "  ║ " + inL   + " │ " + inR   + " ║",
+            "  ║ " + inL   + " │ " + inR   + " ║",
+            "  ║ " + inL   + " │ " + inR   + " ║",
+            "  ║ " + doorL + " │ " + doorR + " ║",
+            "  ╚════════════════╧════════════════╝  [ " + sensor + " ]"
+        );
+    }
+
+    private static String repeat(char c, int count) {
+        if (count <= 0) return "";
+        StringBuilder sb = new StringBuilder(count);
+        for (int i = 0; i < count; i++) {
+            sb.append(c);
         }
         return sb.toString();
     }
