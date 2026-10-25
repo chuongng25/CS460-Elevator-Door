@@ -35,33 +35,47 @@ public class DoorGUI extends Application {
     private Rectangle doorLeft;
 
     private void animateClose() {
+        doorStatusOut.setFill(Color.YELLOW);
         TranslateTransition leftAnimation =
                 new TranslateTransition(Duration.seconds(2), doorLeft);
 
-        leftAnimation.setToX(0);
+        leftAnimation.setToX(600);
 
         TranslateTransition rightAnimation =
                 new TranslateTransition(Duration.seconds(2), doorRight);
 
-        rightAnimation.setToX(0);
+        rightAnimation.setToX(800);
 
         leftAnimation.play();
         rightAnimation.play();
+
+        leftAnimation.setOnFinished(e -> {
+            try{
+                updateDoorStatus();
+            }catch (Exception ex){}
+        });
     }
 
     private void animateOpen() {
+        doorStatusOut.setFill(Color.YELLOW);
         TranslateTransition leftAnimation =
                 new TranslateTransition(Duration.seconds(2), doorLeft);
 
-        leftAnimation.setToX(-200);
+        leftAnimation.setToX(400);
 
         TranslateTransition rightAnimation =
                 new TranslateTransition(Duration.seconds(2), doorRight);
 
-        rightAnimation.setToX(200);
+        rightAnimation.setToX(1000);
 
         leftAnimation.play();
         rightAnimation.play();
+
+        leftAnimation.setOnFinished(e -> {
+            try{
+                updateDoorStatus();
+            }catch (Exception ex){}
+        });
     }
 
     private void updateDoorStatus() throws Exception {
@@ -126,8 +140,6 @@ public class DoorGUI extends Application {
 
             door.open();
             animateOpen();
-            updateDoorStatus();
-
         } catch (Exception ex) {
             System.out.println("Open failed: " + ex.getMessage());
         }
@@ -146,8 +158,6 @@ public class DoorGUI extends Application {
             }
             animateClose();
             door.close();
-            updateDoorStatus();
-
         } catch (Exception ex) {
             System.out.println("Close failed: " + ex.getMessage());
         }
