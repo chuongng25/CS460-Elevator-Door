@@ -27,14 +27,24 @@ public class Main {
             try {
                 switch (input) {
                     case "1":
-                        door.open();
-                        System.out.println("-> Command sent: open()");
-                        animateDoor(door);
+                        if (door.isFullyOpen()) {
+                            System.out.println("-> Door is already fully open.");
+                        } else {
+                            door.open();
+                            System.out.println("-> Command sent: open()");
+                            animateDoor(door);
+                        }
                         break;
                     case "2":
-                        door.close();
-                        System.out.println("-> Command sent: close()");
-                        animateDoor(door);
+                        if (door.isFullyClosed()) {
+                            System.out.println("-> Door is already fully closed.");
+                        } else if (door.hasObstruction()) {
+                            System.out.println("-> Cannot close: optical obstruction sensor is triggered!");
+                        } else {
+                            door.close();
+                            System.out.println("-> Command sent: close()");
+                            animateDoor(door);
+                        }
                         break;
                     case "3":
                         System.out.println("-> isFullyOpen(): " + door.isFullyOpen());
@@ -79,12 +89,16 @@ public class Main {
     }
 
     private static void animateDoor(DoorTwin door) {
-        for (int i = 0; i <= 10; i++) {
+        // Poll dynamically while door is actively moving
+        while (door.getState() == DoorTwin.State.OPENING || door.getState() == DoorTwin.State.CLOSING) {
             System.out.print("\r  Visual: " + door.toAscii() + "   ");
             try {
-                Thread.sleep(200);
-            } catch (InterruptedException ignored) {}
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {
+                break;
+            }
         }
-        System.out.println();
+        // Print the final resting state and advance line
+        System.out.println("\r  Visual: " + door.toAscii() + "   ");
     }
 }
