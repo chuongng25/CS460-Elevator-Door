@@ -97,7 +97,7 @@ public class DoorTwin implements DoorApi {
 
     private void handleClient(Socket socket) {
         String clientAddr = socket.getRemoteSocketAddress().toString();
-        System.out.println("[DoorTwin:Server] Client connected: " + clientAddr);
+        System.out.println("[Twin:Server] Client connected: " + clientAddr);
         try (
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
@@ -116,24 +116,23 @@ public class DoorTwin implements DoorApi {
                 }
 
                 boolean isQuery = trimmed.startsWith("IS_") || trimmed.startsWith("HAS_");
+                String tag = trimmed.equalsIgnoreCase("OPEN") ? "[Twin:Server]" : "[Twin]";
                 if (isQuery) {
                     // Log query only on transition to prevent spam during wait loops
                     if (!trimmed.equalsIgnoreCase(lastQueryCmd) || !response.equalsIgnoreCase(lastQueryRes)) {
-                        System.out.printf("[DoorTwin:Server] << %-15s -> %-5s [%s]%n",
-                            trimmed, response, state);
+                        System.out.printf("%s %s -> %s%n", tag, trimmed, response);
                         lastQueryCmd = trimmed;
                         lastQueryRes = response;
                     }
                 } else {
                     // Always log active command triggers
-                    System.out.printf("[DoorTwin:Server] << %-15s -> %-5s [%s]%n",
-                        trimmed, response, state);
+                    System.out.printf("%s %s -> %s%n", tag, trimmed, response);
                     lastQueryCmd = null;
                 }
             }
         } catch (IOException ignored) {
         } finally {
-            System.out.println("[DoorTwin:Server] Client disconnected: " + clientAddr);
+            System.out.println("[Twin:Server] Client disconnected: " + clientAddr);
             clientSockets.remove(socket);
             try {
                 socket.close();
@@ -309,10 +308,10 @@ public class DoorTwin implements DoorApi {
         System.out.println("  CS460 Team #01: DoorTwin Simulation Server");
         System.out.println("  Port: " + port + " (TCP) | Physics Loop: 20 Hz");
         System.out.println("==================================================");
-        System.out.println("[DoorTwin:Server] Listening for controller connections...\n");
+        System.out.println("[Twin:Server] Listening for controller connections...\n");
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("\n[DoorTwin:Server] Shutting down server...");
+            System.out.println("\n[Twin:Server] Shutting down server...");
             twin.stop();
         }));
 
