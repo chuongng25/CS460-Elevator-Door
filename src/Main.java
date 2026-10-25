@@ -2,8 +2,9 @@ import java.util.Scanner;
 
 /**
  * Interactive CLI & Test Harness for the Elevator Door Assembly.
- * Connects exclusively via DoorManager over a TCP socket connection
- * adhering to the CS460 Digital Twin Hardware Decoupling invariant.
+ * Connects exclusively via DoorManager over a TCP socket connection.
+ * Features an outer Connection Menu (Connect / Disconnect) and an inner
+ * Door Control Menu with 7-line ASCII visualization.
  */
 public class Main {
 
@@ -13,42 +14,88 @@ public class Main {
             return;
         }
 
-        DoorTwin embeddedTwin = null;
-        DoorManager door = new DoorManager();
-
-        // Check if an external DoorTwin server is already running, or start embedded server
-        try {
-            door.connect(DoorManager.DEFAULT_HOST, DoorManager.DEFAULT_PORT);
-        } catch (Exception e) {
-            try {
-                embeddedTwin = new DoorTwin();
-                embeddedTwin.startServer(DoorTwin.DEFAULT_PORT);
-                Thread.sleep(80); // Wait briefly for ServerSocket bind
-                door.connect(DoorManager.DEFAULT_HOST, DoorManager.DEFAULT_PORT);
-            } catch (Exception ex) {
-                System.err.println("Failed to start or connect to DoorTwin server: " + ex.getMessage());
-                return;
-            }
-        }
-
         Scanner scanner = new Scanner(System.in);
-        String lastMessage = null;
+        DoorManager door = new DoorManager();
+        String outerMessage = null;
 
-        boolean running = true;
-        while (running) {
+        boolean appRunning = true;
+        while (appRunning) {
             clearScreen();
             System.out.println("==================================================");
             System.out.println("  CS460 Team #01: Elevator Door Controller CLI");
-            System.out.println("  Bridge: TCP Socket (localhost:" + DoorTwin.DEFAULT_PORT + ")");
+            System.out.println("  Network Status: DISCONNECTED");
+            System.out.println("==================================================");
+            if (outerMessage != null) {
+                System.out.println(outerMessage);
+                outerMessage = null;
+            }
+            System.out.println("--------------------------------------------------");
+            System.out.println(" [1] Connect to default server (localhost:5556)");
+            System.out.println(" [2] Connect to custom host & port");
+            System.out.println(" [0] Exit Application");
+            System.out.println("--------------------------------------------------");
+            System.out.print("Select an option [0-2]: ");
+
+            if (!scanner.hasNextLine()) break;
+            String choice = scanner.nextLine().trim();
+
+            switch (choice) {
+                case "1":
+                    try {
+                        door.connect(DoorManager.DEFAULT_HOST, DoorManager.DEFAULT_PORT);
+                        runDoorControlSession(scanner, door, DoorManager.DEFAULT_HOST, DoorManager.DEFAULT_PORT);
+                        outerMessage = "-> Disconnected from server (localhost:5556).";
+                    } catch (Exception e) {
+                        outerMessage = "[CONNECTION ERROR] Failed to connect to localhost:5556: " + e.getMessage();
+                    }
+                    break;
+                case "2":
+                    System.out.print("Enter server host [localhost]: ");
+                    String host = scanner.nextLine().trim();
+                    if (host.isEmpty()) host = "localhost";
+                    System.out.print("Enter server port [5556]: ");
+                    String portStr = scanner.nextLine().trim();
+                    int port = portStr.isEmpty() ? 5556 : Integer.parseInt(portStr);
+                    try {
+                        door.connect(host, port);
+                        runDoorControlSession(scanner, door, host, port);
+                        outerMessage = "-> Disconnected from " + host + ":" + port;
+                    } catch (Exception e) {
+                        outerMessage = "[CONNECTION ERROR] Could not connect to " + host + ":" + port + ": " + e.getMessage();
+                    }
+                    break;
+                case "0":
+                case "q":
+                case "exit":
+                    clearScreen();
+                    System.out.println("Exiting Elevator Door Controller. Goodbye!");
+                    appRunning = false;
+                    break;
+                default:
+                    outerMessage = "Invalid choice. Please select 0, 1, or 2.";
+            }
+        }
+
+        door.disconnect();
+        scanner.close();
+    }
+
+    private static void runDoorControlSession(Scanner scanner, DoorManager door, String host, int port) {
+        String lastMessage = "-> Successfully connected to DoorTwin server at " + host + ":" + port;
+        boolean inSession = true;
+
+        while (inSession && door.isConnected()) {
+            clearScreen();
+            System.out.println("==================================================");
+            System.out.println("  CS460 Team #01: Elevator Door Controller CLI");
+            System.out.println("  Bridge: CONNECTED (TCP " + host + ":" + port + ")");
             System.out.println("==================================================");
             if (lastMessage != null) {
                 System.out.println(lastMessage);
             }
             printMenu(door);
             System.out.print("Select an option [0-5]: ");
-            if (!scanner.hasNextLine()) {
-                break;
-            }
+            if (!scanner.hasNextLine()) break;
             String input = scanner.nextLine().trim();
 
             try {
@@ -62,7 +109,7 @@ public class Main {
                             clearScreen();
                             System.out.println("==================================================");
                             System.out.println("  CS460 Team #01: Elevator Door Controller CLI");
-                            System.out.println("  Bridge: TCP Socket (localhost:" + DoorTwin.DEFAULT_PORT + ")");
+                            System.out.println("  Bridge: CONNECTED (TCP " + host + ":" + port + ")");
                             System.out.println("==================================================");
                             System.out.println(lastMessage);
                             System.out.println("--------------------------------------------------");
@@ -80,7 +127,7 @@ public class Main {
                             clearScreen();
                             System.out.println("==================================================");
                             System.out.println("  CS460 Team #01: Elevator Door Controller CLI");
-                            System.out.println("  Bridge: TCP Socket (localhost:" + DoorTwin.DEFAULT_PORT + ")");
+                            System.out.println("  Bridge: CONNECTED (TCP " + host + ":" + port + ")");
                             System.out.println("==================================================");
                             System.out.println(lastMessage);
                             System.out.println("--------------------------------------------------");
@@ -98,24 +145,18 @@ public class Main {
                         break;
                     case "0":
                     case "q":
-                    case "exit":
-                        clearScreen();
-                        System.out.println("Disconnecting and exiting Elevator Door CLI. Goodbye!");
-                        running = false;
+                    case "disconnect":
+                        door.disconnect();
+                        inSession = false;
                         break;
                     default:
                         lastMessage = "Invalid choice. Please enter a number between 0 and 5.";
                 }
-            } catch (UnsupportedOperationException e) {
-                lastMessage = "[NOT IMPLEMENTED] " + e.getMessage();
             } catch (Exception e) {
-                lastMessage = "[ERROR] " + e.getMessage();
+                lastMessage = "[CONNECTION ERROR] " + e.getMessage();
+                door.disconnect();
+                inSession = false;
             }
-        }
-        scanner.close();
-        door.disconnect();
-        if (embeddedTwin != null) {
-            embeddedTwin.stop();
         }
     }
 
@@ -133,7 +174,7 @@ public class Main {
         System.out.println(" [3] isFullyOpen()   - Query if aperture is 100% open");
         System.out.println(" [4] isFullyClosed() - Query if aperture is completely sealed");
         System.out.println(" [5] hasObstruction()- Query optical obstruction sensor");
-        System.out.println(" [0] Exit CLI");
+        System.out.println(" [0] Disconnect (Return to connection menu)");
     }
 
     private static void animateDoor(DoorManager door) {

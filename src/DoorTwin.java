@@ -11,7 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Digital Twin: Hardware simulation and physical door logic.
  * Models a center-opening sliding door with real-time kinematic updates,
  * realistic 7-line ASCII doorway visualization, automatic safety reversal,
- * and an embedded line-delimited TCP socket server.
+ * and an embedded line-delimited TCP socket server with live command logging.
  */
 public class DoorTwin implements DoorApi {
 
@@ -96,17 +96,44 @@ public class DoorTwin implements DoorApi {
     }
 
     private void handleClient(Socket socket) {
+        String clientAddr = socket.getRemoteSocketAddress().toString();
+        System.out.println("[DoorTwin:Server] Client connected: " + clientAddr);
         try (
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
         ) {
             String line;
+            String lastQueryCmd = null;
+            String lastQueryRes = null;
+
             while (serverRunning && (line = in.readLine()) != null) {
-                String response = processProtocolCommand(line.trim());
+                String trimmed = line.trim();
+                String response = processProtocolCommand(trimmed);
                 out.println(response);
+
+                if ("STATUS".equalsIgnoreCase(trimmed)) {
+                    continue; // Suppress continuous 100ms animation polling
+                }
+
+                boolean isQuery = trimmed.startsWith("IS_") || trimmed.startsWith("HAS_");
+                if (isQuery) {
+                    // Log query only on transition to prevent spam during wait loops
+                    if (!trimmed.equalsIgnoreCase(lastQueryCmd) || !response.equalsIgnoreCase(lastQueryRes)) {
+                        System.out.printf("[DoorTwin:Server] << %-20s -> >> %-14s (State: %-7s, Pos: %3.0f%%)%n",
+                            trimmed, response, state, position * 100);
+                        lastQueryCmd = trimmed;
+                        lastQueryRes = response;
+                    }
+                } else {
+                    // Always log active command triggers
+                    System.out.printf("[DoorTwin:Server] << %-20s -> >> %-14s (State: %-7s, Pos: %3.0f%%)%n",
+                        trimmed, response, state, position * 100);
+                    lastQueryCmd = null;
+                }
             }
         } catch (IOException ignored) {
         } finally {
+            System.out.println("[DoorTwin:Server] Client disconnected: " + clientAddr);
             clientSockets.remove(socket);
             try {
                 socket.close();
@@ -278,7 +305,17 @@ public class DoorTwin implements DoorApi {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
         DoorTwin twin = new DoorTwin();
         twin.startServer(port);
-        System.out.println("[DoorTwin] Standalone server running on port " + port);
+        System.out.println("==================================================");
+        System.out.println("  CS460 Team #01: DoorTwin Simulation Server");
+        System.out.println("  Port: " + port + " (TCP) | Physics Loop: 20 Hz");
+        System.out.println("==================================================");
+        System.out.println("[DoorTwin:Server] Listening for controller connections...\n");
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("\n[DoorTwin:Server] Shutting down server...");
+            twin.stop();
+        }));
+
         Thread.currentThread().join();
     }
 }
