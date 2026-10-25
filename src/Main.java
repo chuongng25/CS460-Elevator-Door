@@ -2,12 +2,12 @@ import java.util.Scanner;
 
 /**
  * Interactive CLI & Test Harness for the Elevator Door Assembly.
- * Provides an interactive terminal menu offering the 5 standardized DoorApi operations.
+ * Connects directly to DoorTwin in Phase 2 for interactive hardware verification.
  */
 public class Main {
 
     public static void main(String[] args) {
-        DoorApi door = new DoorManager();
+        DoorApi door = new DoorTwin();
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("==================================================");
@@ -72,4 +72,3 @@ public class Main {
         System.out.println(" [0] Exit CLI");
     }
 }
-
