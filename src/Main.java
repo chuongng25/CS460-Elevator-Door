@@ -2,12 +2,13 @@ import java.util.Scanner;
 
 /**
  * Interactive CLI & Test Harness for the Elevator Door Assembly.
- * Connects directly to DoorTwin in Phase 2 for interactive hardware verification.
+ * Connects directly to DoorTwin in Phase 2 for interactive hardware verification,
+ * featuring real-time ASCII visualization of the center-opening sliding doors.
  */
 public class Main {
 
     public static void main(String[] args) {
-        DoorApi door = new DoorTwin();
+        DoorTwin door = new DoorTwin();
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("==================================================");
@@ -16,7 +17,7 @@ public class Main {
 
         boolean running = true;
         while (running) {
-            printMenu();
+            printMenu(door);
             System.out.print("Select an option [0-5]: ");
             if (!scanner.hasNextLine()) {
                 break;
@@ -28,10 +29,12 @@ public class Main {
                     case "1":
                         door.open();
                         System.out.println("-> Command sent: open()");
+                        animateDoor(door);
                         break;
                     case "2":
                         door.close();
                         System.out.println("-> Command sent: close()");
+                        animateDoor(door);
                         break;
                     case "3":
                         System.out.println("-> isFullyOpen(): " + door.isFullyOpen());
@@ -60,15 +63,28 @@ public class Main {
             System.out.println();
         }
         scanner.close();
+        door.stop();
     }
 
-    private static void printMenu() {
-        System.out.println("--- Door Operations Menu ---");
+    private static void printMenu(DoorTwin door) {
+        System.out.println("--------------------------------------------------");
+        System.out.println("  Door Visual: " + door.toAscii());
+        System.out.println("--------------------------------------------------");
         System.out.println(" [1] open()          - Command door leaves to slide open");
         System.out.println(" [2] close()         - Command door leaves to slide shut");
         System.out.println(" [3] isFullyOpen()   - Query if aperture is 100% open");
         System.out.println(" [4] isFullyClosed() - Query if aperture is completely sealed");
         System.out.println(" [5] hasObstruction()- Query optical obstruction sensor");
         System.out.println(" [0] Exit CLI");
+    }
+
+    private static void animateDoor(DoorTwin door) {
+        for (int i = 0; i <= 10; i++) {
+            System.out.print("\r  Visual: " + door.toAscii() + "   ");
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ignored) {}
+        }
+        System.out.println();
     }
 }

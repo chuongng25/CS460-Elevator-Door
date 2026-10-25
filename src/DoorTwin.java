@@ -125,6 +125,30 @@ public class DoorTwin implements DoorApi {
         return state;
     }
 
+    /**
+     * Renders a real-time ASCII text visual of the 2-leaf center-opening sliding door.
+     */
+    public synchronized String toAscii() {
+        int w = 12;
+        int closedW = (int) Math.round((1.0 - position) * w);
+        int openW = w - closedW;
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        // Left sliding leaf (retreats to the left)
+        for (int i = 0; i < closedW; i++) sb.append("█");
+        for (int i = 0; i < openW; i++) sb.append(" ");
+        sb.append(" | ");
+        // Right sliding leaf (retreats to the right)
+        for (int i = 0; i < openW; i++) sb.append(" ");
+        for (int i = 0; i < closedW; i++) sb.append("█");
+        sb.append("] ");
+        sb.append(String.format("%3.0f%% [%s]", position * 100, state));
+        if (obstruction) {
+            sb.append(" (OBSTRUCTION DETECTED!)");
+        }
+        return sb.toString();
+    }
+
     public void stop() {
         running = false;
         if (ticker != null) {
