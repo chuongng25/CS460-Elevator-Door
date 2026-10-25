@@ -119,15 +119,15 @@ public class DoorTwin implements DoorApi {
                 if (isQuery) {
                     // Log query only on transition to prevent spam during wait loops
                     if (!trimmed.equalsIgnoreCase(lastQueryCmd) || !response.equalsIgnoreCase(lastQueryRes)) {
-                        System.out.printf("[DoorTwin:Server] << %-20s -> >> %-14s (State: %-7s, Pos: %3.0f%%)%n",
-                            trimmed, response, state, position * 100);
+                        System.out.printf("[DoorTwin:Server] << %-15s -> %-5s [%s]%n",
+                            trimmed, response, state);
                         lastQueryCmd = trimmed;
                         lastQueryRes = response;
                     }
                 } else {
                     // Always log active command triggers
-                    System.out.printf("[DoorTwin:Server] << %-20s -> >> %-14s (State: %-7s, Pos: %3.0f%%)%n",
-                        trimmed, response, state, position * 100);
+                    System.out.printf("[DoorTwin:Server] << %-15s -> %-5s [%s]%n",
+                        trimmed, response, state);
                     lastQueryCmd = null;
                 }
             }
