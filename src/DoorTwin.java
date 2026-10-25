@@ -1,7 +1,17 @@
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 /**
  * Digital Twin: Hardware simulation and physical door logic.
  * Models a center-opening sliding door with real-time kinematic updates,
- * realistic 7-line ASCII doorway visualization, and automatic safety reversal.
+ * realistic 7-line ASCII doorway visualization, automatic safety reversal,
+ * and an embedded line-delimited TCP socket server.
  */
 public class DoorTwin implements DoorApi {
 
@@ -18,6 +28,10 @@ public class DoorTwin implements DoorApi {
 
     private Thread ticker;
     private volatile boolean running = true;
+    private ServerSocket serverSocket;
+    private Thread serverThread;
+    private volatile boolean serverRunning = false;
+    private final List<Socket> clientSockets = new CopyOnWriteArrayList<>();
 
     /**
      * Default constructor: initializes door and starts background real-time ticker (20 Hz).
@@ -53,6 +67,85 @@ public class DoorTwin implements DoorApi {
         }, "DoorPhysicsTicker");
         ticker.setDaemon(true);
         ticker.start();
+    }
+
+    /**
+     * Starts the embedded TCP socket server on the specified port.
+     */
+    public synchronized void startServer(int port) throws IOException {
+        if (serverRunning) return;
+        serverSocket = new ServerSocket(port);
+        serverRunning = true;
+        serverThread = new Thread(this::listenClients, "DoorTwin-Server");
+        serverThread.setDaemon(true);
+        serverThread.start();
+    }
+
+    private void listenClients() {
+        while (serverRunning && serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                Socket client = serverSocket.accept();
+                clientSockets.add(client);
+                Thread clientThread = new Thread(() -> handleClient(client), "DoorTwin-Client-" + client.getPort());
+                clientThread.setDaemon(true);
+                clientThread.start();
+            } catch (IOException e) {
+                if (!serverRunning) break;
+            }
+        }
+    }
+
+    private void handleClient(Socket socket) {
+        try (
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
+        ) {
+            String line;
+            while (serverRunning && (line = in.readLine()) != null) {
+                String response = processProtocolCommand(line.trim());
+                out.println(response);
+            }
+        } catch (IOException ignored) {
+        } finally {
+            clientSockets.remove(socket);
+            try {
+                socket.close();
+            } catch (IOException ignored) {}
+        }
+    }
+
+    /**
+     * Processes line-delimited ASCII wire protocol commands.
+     */
+    public synchronized String processProtocolCommand(String line) {
+        if (line == null || line.isEmpty()) return "ERR_EMPTY";
+        String[] parts = line.split("\\s+");
+        String cmd = parts[0].toUpperCase();
+
+        switch (cmd) {
+            case "OPEN":
+                open();
+                return "OK";
+            case "CLOSE":
+                close();
+                return obstruction ? "ERR_OBSTRUCTED" : "OK";
+            case "IS_OPEN":
+                return Boolean.toString(isFullyOpen());
+            case "IS_CLOSED":
+                return Boolean.toString(isFullyClosed());
+            case "HAS_OBSTRUCTION":
+                return Boolean.toString(hasObstruction());
+            case "SET_OBSTRUCTION":
+                if (parts.length >= 2) {
+                    setObstruction(Boolean.parseBoolean(parts[1]));
+                    return "OK";
+                }
+                return "ERR_MISSING_PARAM";
+            case "STATUS":
+                return String.format(java.util.Locale.US, "STATUS %s %.4f %b", state.name(), position, obstruction);
+            default:
+                return "ERR_UNKNOWN_COMMAND: " + cmd;
+        }
     }
 
     /**
@@ -159,10 +252,33 @@ public class DoorTwin implements DoorApi {
         return sb.toString();
     }
 
-    public void stop() {
+    public synchronized void stop() {
         running = false;
+        serverRunning = false;
         if (ticker != null) {
             ticker.interrupt();
         }
+        for (Socket s : clientSockets) {
+            try {
+                s.close();
+            } catch (IOException ignored) {}
+        }
+        clientSockets.clear();
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            try {
+                serverSocket.close();
+            } catch (IOException ignored) {}
+        }
+        if (serverThread != null) {
+            serverThread.interrupt();
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
+        DoorTwin twin = new DoorTwin();
+        twin.startServer(port);
+        System.out.println("[DoorTwin] Standalone server running on port " + port);
+        Thread.currentThread().join();
     }
 }
