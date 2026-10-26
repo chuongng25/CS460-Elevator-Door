@@ -21,7 +21,6 @@ FX_FLAGS = $(if $(JAVAFX_LIB),--module-path "$(JAVAFX_LIB)" --add-modules javafx
 all: sim
 
 compile:
-	@mkdir -p $(OUT)
 	@"$(JAVAC)" -d $(OUT) $(FX_FLAGS) $(SRCS)
 
 sim: compile
@@ -31,4 +30,4 @@ test: compile
 	@"$(JAVA)" -cp $(OUT) Main
 
 clean:
-	@rm -rf $(OUT)
+	-@rm -rf $(OUT) || rmdir /s /q $(OUT)
