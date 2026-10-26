@@ -1,60 +1,40 @@
-# CS460 Project 2: Elevator Door Assembly (DOR)
+Basic elevator door sim. When we combine with the other groups, we will create an adapter that will hook into  group 3s bus
 
-**CS 460 Software Engineering — University of New Mexico (Team #01)**
+DOOR API: the five methods other teams use. Frozen by agreement.
+DOORTWIN: the simulated hardware.
+DOORGUI: mostly the panel. Commands the door through DOORAPI reads position and sets the sensors directly on the twin.
+MAIN: headless self-test.
 
----
+API
+void    open();
+void    close();
+boolean isFullyOpen();
+boolean isFullyClosed();
+boolean hasObstruction();
+Physical design
+Door opening : 4 ft wide, 7 ft high, center opening
+Leaf travel : 2 ft each 
+Speed : 1.0 ft/s (0.305 m/s) 
+Open/close time : 2.0 s 
+Time step : 0.05s approx 
+Constant velocity; acceleration is not modelled (but was mentioned maybe it should be?)
+two sensors that p much do the same thing, one for above one for below.
+and a weight sensor in the sill. Either one reverses a closing door. The
+reversal is decided inside the twin with no message to anything else, so it
+still works if the car's wireless link drops.
 
-## 1. Architecture & Flat File Structure
+make sim     the GUI
+make test    self-test
+make clean
+NEEDS JDK
 
-The project strictly follows the **Digital Twin (DTW)** hardware abstraction pattern in a clean, flat 5-file layout:
+What we need from 3 and the other team:
+Team #03's bus is the integration path. Pub/sub, 8-byte messages, subtopic =
+car number which is why DOORTWIN carries a `carId`. Nothing in DOORAPI,
+the physics, or the panel changes:
 
-```text
-src/
-├── DoorApi.java       # Contract: The 5 agreed-upon door control & inquiry APIs
-├── DoorManager.java   # Client Bridge: Implements DoorApi over TCP Socket connection
-├── DoorTwin.java      # Hardware Twin: Center-opening sliding door kinematics & Socket server
-├── DoorGUI.java       # View: JavaFX graphical simulation & manual diagnostic buttons
-└── Main.java          # Controller / CLI: Interactive terminal test harness
-```
+bus.subscribe(id, "door/command", carId);
+String cmd = bus.getMessage("door/command", carId);
+if ("open".equals(cmd)) twin.open();
+bus.publish(id, "door/state " + carId + " " + twin.getState());
 
----
-
-## 2. System Invariants (Strict Rules)
-
-1. **Flat Structure Invariant (No File Bloat)**:
-   - Keep all code strictly inside the flat `src/` directory.
-   - **DO NOT** create nested packages (e.g. `elevator/door/view`), speculative helpers, or unnecessary wrapper classes.
-   - Any new functionality must fit cleanly into the existing 5 core files unless explicitly requested.
-
-2. **API Contract Invariant**:
-   - `DoorApi.java` defines the exact contract required by the instructor and cross-team specifications:
-     - `void open()`
-     - `void close()`
-     - `boolean isFullyOpen()`
-     - `boolean isFullyClosed()`
-     - `boolean hasObstruction()`
-   - **DO NOT** alter, rename, or overload these method signatures.
-
-3. **Commit Convention Invariant**:
-   - All commits must strictly follow **Conventional Commits** scoped to `door`:
-     `<type>(door): <brief description>`
-   - Allowed types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `build`.
-   - Examples:
-     - `feat(door): implement center-opening physics and obstruction safety reversal`
-     - `test(door): add interactive CLI menu in Main for DoorApi operations`
-     - `refactor(door): streamline socket listener thread and command parser`
-
----
-
-## 3. Quick Start & Execution
-
-```bash
-# Compile all source files
-make compile
-
-# Run interactive CLI Test Harness (Menu options 0-5)
-make cli     # or make test
-
-# Launch JavaFX Digital Twin GUI Simulation
-make sim
-```

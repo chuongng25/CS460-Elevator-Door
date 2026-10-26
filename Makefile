@@ -1,45 +1,34 @@
-JAVA_HOME ?= $(firstword $(wildcard \
-    /opt/homebrew/opt/openjdk*/libexec/openjdk.jdk/Contents/Home \
-    /usr/local/opt/openjdk*/libexec/openjdk.jdk/Contents/Home \
-    /Library/Java/JavaVirtualMachines/*/Contents/Home \
-))
-
-JAVAC = $(if $(JAVA_HOME),$(JAVA_HOME)/bin/javac,javac)
-JAVA  = $(if $(JAVA_HOME),$(JAVA_HOME)/bin/java,java)
+# Uses javac/java from PATH. Override if you need a specific JDK:
+#   make sim JAVAC=/path/to/javac JAVA=/path/to/java
+JAVAC ?= javac
+JAVA  ?= java
 OUT   = out
-MODULES = javafx.controls,javafx.fxml
-JAVA_FLAGS = -XX:+IgnoreUnrecognizedVMOptions --enable-native-access=ALL-UNNAMED,javafx.graphics --sun-misc-unsafe-memory-access=allow
+SRCS  = $(wildcard src/*.java)
 
 JAVAFX_LIB ?= $(firstword $(wildcard \
     $(JAVAFX_HOME)/lib \
-    $(HOME)/Library/javafx-sdk/*/lib \
     $(HOME)/Downloads/javafx-sdk-*/lib \
+    $(USERPROFILE)/Downloads/javafx-sdk-*/lib \
     /opt/homebrew/opt/openjfx/lib \
     /usr/local/opt/openjfx/lib \
     /usr/share/openjfx/lib \
 ))
 
-SRCS = $(shell find src -name "*.java")
+FX_FLAGS = $(if $(JAVAFX_LIB),--module-path "$(JAVAFX_LIB)" --add-modules javafx.controls)
 
-.PHONY: all sim test cli server compile clean
+.PHONY: all compile sim test clean
 
-all: cli
+all: sim
 
 compile:
 	@mkdir -p $(OUT)
-	@$(JAVAC) -d $(OUT) --module-path "$(JAVAFX_LIB)" --add-modules $(MODULES) $(SRCS)
-
-server: compile
-	@$(JAVA) -cp $(OUT) DoorTwin
-
-cli: compile
-	@$(JAVA) -cp $(OUT) Main
-
-test: compile
-	@$(JAVA) -cp $(OUT) Main --test
+	@"$(JAVAC)" -d $(OUT) $(FX_FLAGS) $(SRCS)
 
 sim: compile
-	@$(JAVA) $(JAVA_FLAGS) --module-path "$(JAVAFX_LIB)" --add-modules $(MODULES) -cp $(OUT) DoorGUI
+	@"$(JAVA)" $(FX_FLAGS) -cp $(OUT) DoorGUI
+
+test: compile
+	@"$(JAVA)" -cp $(OUT) Main
 
 clean:
-	@python3 -c "import shutil; shutil.rmtree('$(OUT)', ignore_errors=True)"
+	@rm -rf $(OUT)
