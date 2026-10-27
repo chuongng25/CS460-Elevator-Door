@@ -25,6 +25,8 @@ public class DoorTwin implements DoorApi {
     private State state = State.CLOSED;
     private double position = 0.0; // 0.0 = fully closed, 1.0 = fully open
     private boolean obstruction = false;
+    private boolean beamBroken = false;
+    private boolean sillLoaded = false;
 
     private Thread ticker;
     private volatile boolean running = true;
@@ -33,16 +35,14 @@ public class DoorTwin implements DoorApi {
     private volatile boolean serverRunning = false;
     private final List<Socket> clientSockets = new CopyOnWriteArrayList<>();
 
-    /**
-     * Default constructor: initializes door and starts background real-time ticker (20 Hz).
-     */
     public DoorTwin() {
         this(DEFAULT_DURATION_SEC, true);
     }
 
-    /**
-     * Flexible constructor for real-time execution or headless discrete testing.
-     */
+    public DoorTwin(double durationSec) {
+        this(durationSec, true);
+    }
+
     public DoorTwin(double durationSec, boolean startTicker) {
         this.durationSec = durationSec;
         if (startTicker) {
@@ -185,7 +185,7 @@ public class DoorTwin implements DoorApi {
                 state = State.OPEN;
             }
         } else if (state == State.CLOSING) {
-            if (obstruction) {
+            if (hasObstruction()) {
                 open(); // Safety reversal: instantly reverse if blocked
                 return;
             }
@@ -206,7 +206,7 @@ public class DoorTwin implements DoorApi {
 
     @Override
     public synchronized void close() {
-        if (!obstruction && state != State.CLOSED) {
+        if (!hasObstruction() && state != State.CLOSED) {
             state = State.CLOSING;
         }
     }
@@ -223,7 +223,7 @@ public class DoorTwin implements DoorApi {
 
     @Override
     public synchronized boolean hasObstruction() {
-        return obstruction;
+        return obstruction || beamBroken || sillLoaded;
     }
 
     public synchronized void setObstruction(boolean blocked) {
@@ -231,6 +231,28 @@ public class DoorTwin implements DoorApi {
         if (blocked && state == State.CLOSING) {
             open(); // Instant safety reversal
         }
+    }
+
+    public synchronized void setBeamBroken(boolean broken) {
+        this.beamBroken = broken;
+        if (broken && state == State.CLOSING) {
+            open();
+        }
+    }
+
+    public synchronized void setSillLoaded(boolean loaded) {
+        this.sillLoaded = loaded;
+        if (loaded && state == State.CLOSING) {
+            open();
+        }
+    }
+
+    public synchronized boolean isBeamBroken() {
+        return beamBroken;
+    }
+
+    public synchronized boolean isSillLoaded() {
+        return sillLoaded;
     }
 
     public synchronized double getPosition() {
