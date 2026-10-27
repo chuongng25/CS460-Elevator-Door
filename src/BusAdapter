@@ -1,0 +1,24 @@
+public class BusAdapter{
+    public static final int DOOR_COMMAND;
+    public static final int DOOR_STATE;
+    public static final int CAR_STATE;
+    public static final byte OPEN = 1;
+    public static final byte CLOSE = 2;
+
+    public static final byte STOPPED = 0
+    public static final byte MOVING = 1
+    public static final long pollTimeMS = 50;
+
+    pulic BusAdapter(DoorTwin twin, SoftwareBus bus){
+
+    }
+    public void publishDoorState(){
+
+    }
+    public void handle(byte[] message){
+
+    }
+
+
+
+}

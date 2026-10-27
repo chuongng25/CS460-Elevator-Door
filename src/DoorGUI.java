@@ -9,9 +9,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
-//Destiny Look my way.
 public class DoorGUI extends Application {
-
+    //I dont really know how we are going to show 4 different doors.
     private final DoorTwin twin = new DoorTwin(1);
 
     //Only API methods
@@ -80,6 +79,13 @@ public class DoorGUI extends Application {
         background.setFill(Color.TAN);
         StackPane.setAlignment(background, Pos.TOP_LEFT);
         root.getChildren().add(background);
+
+        Rectangle doorway = new Rectangle(400, 500);
+        doorway.setFill(Color.BLACK);
+        StackPane.setAlignment(doorway, Pos.TOP_LEFT);
+        doorway.setTranslateX(600);
+        doorway.setTranslateY(150);
+        root.getChildren().add(doorway);
 
         Rectangle sidePanel = new Rectangle(0, 0, 400, 800);
         sidePanel.setFill(Color.SLATEGRAY);
