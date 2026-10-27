@@ -92,7 +92,7 @@ public class DoorGUI extends Application {
         StackPane.setAlignment(sidePanel, Pos.TOP_LEFT);
         root.getChildren().add(sidePanel);
 
-        beamButton = new Button("Light Curtain: clear");
+        beamButton = new Button("Light Beam: clear");
         beamButton.setPrefSize(200, 25);
         StackPane.setAlignment(beamButton, Pos.TOP_LEFT);
         beamButton.setTranslateX(50);
