@@ -4,80 +4,176 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
-//Destiny Look my way.
+/**
+ * JavaFX View: Graphical visualization of the elevator door and control panel.
+ * Connects exclusively via DoorManager over TCP socket complying with
+ * CS460 Digital Twin Hardware Decoupling architecture.
+ */
 public class DoorGUI extends Application {
 
-    private final DoorTwin twin = new DoorTwin(1);
+    private final DoorManager door = new DoorManager();
+    private DoorTwin embeddedTwin = null;
 
-    //Only API methods
-    private final DoorApi door = twin;
-
-    //Door leaves travel 200 px each; closed at 600/800, open at 400/1000.
-    private static final double LEAF_TRAVEL_PX = 200;
+    private static final double LEAF_WIDTH = 200;
     private static final double LEFT_CLOSED_X = 600;
     private static final double RIGHT_CLOSED_X = 800;
 
-    private Button beamButton;
-    private Button sillButton;
+    private TextField hostInput;
+    private TextField socketInput;
+
+    private Button connectButton;
+    private Button disconnectButton;
     private Button openDoor;
     private Button closeDoor;
+    private Button toggleObstructionButton;
 
+    private Rectangle connectStatus;
     private Rectangle obstructedOut;
     private Rectangle doorStatusOut;
 
     private Rectangle doorRight;
     private Rectangle doorLeft;
 
+    private AnimationTimer telemetryTimer;
+
     private void updateDoorStatus() {
-        double p = twin.getPosition();
-        doorLeft.setTranslateX(LEFT_CLOSED_X - LEAF_TRAVEL_PX * p);
-        doorRight.setTranslateX(RIGHT_CLOSED_X + LEAF_TRAVEL_PX * p);
-
-        boolean open = door.isFullyOpen();
-        boolean closed = door.isFullyClosed();
-        boolean obstruction = door.hasObstruction();
-
-        // Green means open; red means closed; yellow means moving.
-        if (open) {
-            doorStatusOut.setFill(Color.GREEN);
-        } else if (closed) {
-            doorStatusOut.setFill(Color.RED);
-        } else {
-            doorStatusOut.setFill(Color.YELLOW);
+        if (!door.isConnected()) {
+            connectStatus.setFill(Color.RED);
+            doorStatusOut.setFill(Color.GRAY);
+            obstructedOut.setFill(Color.GRAY);
+            return;
         }
 
-        obstructedOut.setFill(
-                obstruction ? Color.RED : Color.GREEN
-        );
+        connectStatus.setFill(Color.GREEN);
 
-        beamButton.setText(twin.isBeamBroken() ? "Light Curtain: BROKEN" : "Light Curtain: clear");
-        sillButton.setText(twin.isSillLoaded() ? "Sill Sensor: LOADED" : "Sill Sensor: clear");
+        try {
+            double p = door.getPosition();
+            doorLeft.setTranslateX(LEFT_CLOSED_X - LEAF_WIDTH * p);
+            doorRight.setTranslateX(RIGHT_CLOSED_X + LEAF_WIDTH * p);
+
+            boolean open = door.isFullyOpen();
+            boolean closed = door.isFullyClosed();
+            boolean obstruction = door.hasObstruction();
+
+            // Green means open; red means closed; yellow means moving.
+            if (open) {
+                doorStatusOut.setFill(Color.GREEN);
+            } else if (closed) {
+                doorStatusOut.setFill(Color.RED);
+            } else {
+                doorStatusOut.setFill(Color.YELLOW);
+            }
+
+            obstructedOut.setFill(obstruction ? Color.RED : Color.GREEN);
+            toggleObstructionButton.setText(obstruction ? "Obstruction: ACTIVE (Click to Clear)" : "Obstruction: CLEAR (Click to Trip)");
+        } catch (Exception e) {
+            connectStatus.setFill(Color.RED);
+        }
+    }
+
+    private void handleConnect() {
+        try {
+            String host = hostInput.getText().trim();
+            String portText = socketInput.getText().trim();
+
+            if (host.isEmpty()) host = DoorManager.DEFAULT_HOST;
+            if (portText.isEmpty()) portText = String.valueOf(DoorManager.DEFAULT_PORT);
+
+            int port = Integer.parseInt(portText);
+            if (port < 1 || port > 65535) {
+                System.out.println("Port must be between 1 and 65535.");
+                return;
+            }
+
+            // Try connecting to existing server; if none running locally, spawn embedded server
+            try {
+                door.connect(host, port);
+            } catch (Exception connEx) {
+                if ("localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)) {
+                    System.out.println("Starting embedded DoorTwin server on port " + port + "...");
+                    embeddedTwin = new DoorTwin();
+                    embeddedTwin.startServer(port);
+                    Thread.sleep(80);
+                    door.connect(host, port);
+                } else {
+                    throw connEx;
+                }
+            }
+
+            connectStatus.setFill(Color.GREEN);
+            System.out.println("Connected to " + host + ":" + port);
+        } catch (NumberFormatException ex) {
+            System.out.println("Invalid port number.");
+        } catch (Exception ex) {
+            connectStatus.setFill(Color.RED);
+            System.out.println("Connection failed: " + ex.getMessage());
+        }
+    }
+
+    private void handleDisconnect() {
+        door.disconnect();
+        if (embeddedTwin != null) {
+            embeddedTwin.stop();
+            embeddedTwin = null;
+        }
+        connectStatus.setFill(Color.RED);
+        doorStatusOut.setFill(Color.GRAY);
+        obstructedOut.setFill(Color.GRAY);
+        System.out.println("Disconnected.");
     }
 
     private void handleOpen() {
-        door.open();
+        try {
+            if (!door.isConnected()) {
+                System.out.println("Connect to the server first.");
+                return;
+            }
+            door.open();
+        } catch (Exception ex) {
+            System.out.println("Open failed: " + ex.getMessage());
+        }
     }
 
     private void handleClose() {
-        door.close();
+        try {
+            if (!door.isConnected()) {
+                System.out.println("Connect to the server first.");
+                return;
+            }
+            if (door.hasObstruction()) {
+                obstructedOut.setFill(Color.RED);
+                System.out.println("Cannot close: obstruction detected.");
+                return;
+            }
+            door.close();
+        } catch (Exception ex) {
+            System.out.println("Close failed: " + ex.getMessage());
+        }
     }
 
-    private void toggleBeam() {
-        twin.setBeamBroken(!twin.isBeamBroken());
-    }
-
-    private void toggleSill() {
-        twin.setSillLoaded(!twin.isSillLoaded());
+    private void handleToggleObstruction() {
+        try {
+            if (!door.isConnected()) {
+                System.out.println("Connect to the server first.");
+                return;
+            }
+            boolean current = door.hasObstruction();
+            door.setObstruction(!current);
+            updateDoorStatus();
+        } catch (Exception ex) {
+            System.out.println("Toggle obstruction failed: " + ex.getMessage());
+        }
     }
 
     private void initialize(Scene scene, StackPane root) {
         Rectangle background = new Rectangle(0, 0, 1200, 800);
-        background.setFill(Color.TAN);
+        background.setFill(Color.LIGHTGRAY);
         StackPane.setAlignment(background, Pos.TOP_LEFT);
         root.getChildren().add(background);
 
@@ -86,21 +182,44 @@ public class DoorGUI extends Application {
         StackPane.setAlignment(sidePanel, Pos.TOP_LEFT);
         root.getChildren().add(sidePanel);
 
-        beamButton = new Button("Light Curtain: clear");
-        beamButton.setPrefSize(200, 25);
-        StackPane.setAlignment(beamButton, Pos.TOP_LEFT);
-        beamButton.setTranslateX(50);
-        beamButton.setTranslateY(100);
-        root.getChildren().add(beamButton);
-        beamButton.setOnAction(e -> toggleBeam());
+        hostInput = new TextField("localhost");
+        hostInput.setPromptText("Host (e.g. localhost)");
+        hostInput.setMaxWidth(300);
+        StackPane.setAlignment(hostInput, Pos.TOP_LEFT);
+        hostInput.setTranslateX(50);
+        hostInput.setTranslateY(50);
+        root.getChildren().add(hostInput);
 
-        sillButton = new Button("Sill Sensor: clear");
-        sillButton.setPrefSize(200, 25);
-        StackPane.setAlignment(sillButton, Pos.TOP_LEFT);
-        sillButton.setTranslateX(50);
-        sillButton.setTranslateY(150);
-        root.getChildren().add(sillButton);
-        sillButton.setOnAction(e -> toggleSill());
+        socketInput = new TextField("5556");
+        socketInput.setPromptText("Port (e.g. 5556)");
+        socketInput.setMaxWidth(300);
+        StackPane.setAlignment(socketInput, Pos.TOP_LEFT);
+        socketInput.setTranslateX(50);
+        socketInput.setTranslateY(100);
+        root.getChildren().add(socketInput);
+
+        connectButton = new Button("Connect");
+        connectButton.setPrefSize(100, 25);
+        StackPane.setAlignment(connectButton, Pos.TOP_LEFT);
+        connectButton.setTranslateX(50);
+        connectButton.setTranslateY(150);
+        root.getChildren().add(connectButton);
+        connectButton.setOnAction(e -> handleConnect());
+
+        disconnectButton = new Button("Disconnect");
+        disconnectButton.setPrefSize(100, 25);
+        StackPane.setAlignment(disconnectButton, Pos.TOP_LEFT);
+        disconnectButton.setTranslateX(175);
+        disconnectButton.setTranslateY(150);
+        root.getChildren().add(disconnectButton);
+        disconnectButton.setOnAction(e -> handleDisconnect());
+
+        connectStatus = new Rectangle(0, 0, 25, 25);
+        connectStatus.setFill(Color.RED);
+        StackPane.setAlignment(connectStatus, Pos.TOP_LEFT);
+        connectStatus.setTranslateX(325);
+        connectStatus.setTranslateY(150);
+        root.getChildren().add(connectStatus);
 
         openDoor = new Button("Open Door");
         openDoor.setPrefSize(200, 25);
@@ -152,15 +271,22 @@ public class DoorGUI extends Application {
         root.getChildren().add(doorStatus);
 
         doorStatusOut = new Rectangle(75, 25);
-        doorStatusOut.setFill(Color.RED);
+        doorStatusOut.setFill(Color.GREEN);
         StackPane.setAlignment(doorStatusOut, Pos.TOP_LEFT);
         doorStatusOut.setTranslateX(250);
         doorStatusOut.setTranslateY(400);
         root.getChildren().add(doorStatusOut);
 
+        toggleObstructionButton = new Button("Obstruction: CLEAR (Click to Trip)");
+        toggleObstructionButton.setPrefSize(275, 30);
+        StackPane.setAlignment(toggleObstructionButton, Pos.TOP_LEFT);
+        toggleObstructionButton.setTranslateX(50);
+        toggleObstructionButton.setTranslateY(450);
+        root.getChildren().add(toggleObstructionButton);
+        toggleObstructionButton.setOnAction(e -> handleToggleObstruction());
+
         doorLeft = new Rectangle(200, 500);
         doorLeft.setFill(Color.SILVER);
-        //dark outline so you can see the line where the two doors meet
         doorLeft.setStroke(Color.DIMGRAY);
         doorLeft.setStrokeWidth(2);
         StackPane.setAlignment(doorLeft, Pos.TOP_LEFT);
@@ -183,15 +309,30 @@ public class DoorGUI extends Application {
         StackPane root = new StackPane();
         Scene scene = new Scene(root, 1200, 800);
         initialize(scene, root);
-        //redraw from the twin's real position every frame
-        new AnimationTimer() {
+
+        // Real-time animation loop synchronized with DoorTwin physics over TCP socket
+        telemetryTimer = new AnimationTimer() {
+            private long lastUpdate = 0;
+            @Override
             public void handle(long now) {
-                updateDoorStatus();
+                // Poll every ~33ms (30 FPS) to maintain smooth UI and low socket overhead
+                if (now - lastUpdate >= 33_000_000L) {
+                    lastUpdate = now;
+                    updateDoorStatus();
+                }
             }
-        }.start();
-        primaryStage.setTitle("Elevator Door");
+        };
+        telemetryTimer.start();
+
+        primaryStage.setTitle("CS460 Team #01 - Elevator Door Simulator");
         primaryStage.setScene(scene);
-        primaryStage.setOnHidden(e -> twin.stop());
+        primaryStage.setOnHidden(e -> {
+            if (telemetryTimer != null) telemetryTimer.stop();
+            door.disconnect();
+            if (embeddedTwin != null) {
+                embeddedTwin.stop();
+            }
+        });
         primaryStage.show();
     }
 
