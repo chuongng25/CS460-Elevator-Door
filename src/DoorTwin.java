@@ -11,7 +11,7 @@ public class DoorTwin implements DoorApi {
     //time it takes to open/close a door fully. will be used later for updating GUI
     public static final double DEFAULT_DURATION_SEC = DOOR_TRAVEL/DOOR_SPEED_FPS;
     //Twin threads clock for changing positition
-    private static final long TICK_MS = 50;
+    private static final long TICK_MS = 25;
     //each of the 4 elevator cars and effectively doors ID. Needed for implementation with 4 cars
     //but for the demo we only use car1.
     private final int carId;
