@@ -9,7 +9,7 @@ public class DoorTwin implements DoorApi {
     //speed is 1 foot per second per panel. UPDATE USE ONLY IF SPEED CHANGES AND UPDATE DDS
     public static final double DOOR_SPEED_FPS = 1.0;
     //time it takes to open/close a door fully. will be used later for updating GUI
-    public static final double DEFAULT_DURATION_SEC = 2.0;
+    public static final double DEFAULT_DURATION_SEC = DOOR_TRAVEL/DOOR_SPEED_FPS;
     //Twin threads clock for changing positition
     private static final long TICK_MS = 50;
     //each of the 4 elevator cars and effectively doors ID. Needed for implementation with 4 cars

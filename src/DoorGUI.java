@@ -54,7 +54,7 @@ public class DoorGUI extends Application {
                 obstruction ? Color.RED : Color.GREEN
         );
 
-        beamButton.setText(twin.isBeamBroken() ? "Light Curtain: BROKEN" : "Light Curtain: clear");
+        beamButton.setText(twin.isBeamBroken() ? "Light Beam: BROKEN" : "Light Beam: clear");
         sillButton.setText(twin.isSillLoaded() ? "Sill Sensor: LOADED" : "Sill Sensor: clear");
     }
 
