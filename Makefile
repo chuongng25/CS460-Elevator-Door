@@ -21,7 +21,7 @@ JAVAFX_LIB ?= $(firstword $(wildcard \
 
 SRCS = $(shell find src -name "*.java")
 
-.PHONY: all sim test cli server compile clean
+.PHONY: all sim test cli compile clean
 
 all: cli
 
@@ -29,14 +29,11 @@ compile:
 	@mkdir -p $(OUT)
 	@$(JAVAC) -d $(OUT) --module-path "$(JAVAFX_LIB)" --add-modules $(MODULES) $(SRCS)
 
-server: compile
-	@$(JAVA) -cp $(OUT) DoorTwin
-
 cli: compile
 	@$(JAVA) -cp $(OUT) Main
 
 test: compile
-	@$(JAVA) -cp $(OUT) Main --test
+	@$(JAVA) -cp $(OUT) DoorTest
 
 sim: compile
 	@$(JAVA) $(JAVA_FLAGS) --module-path "$(JAVAFX_LIB)" --add-modules $(MODULES) -cp $(OUT) DoorGUI
