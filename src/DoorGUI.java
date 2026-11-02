@@ -29,8 +29,6 @@ public class DoorGUI extends Application {
     private static final double LEFT_CLOSED_X = 600;
     private static final double RIGHT_CLOSED_X = 800;
     private Button sillButton;
-    private Button openDoor;
-    private Button closeDoor;
 
     private Rectangle doorRight;
     private Rectangle doorLeft;
