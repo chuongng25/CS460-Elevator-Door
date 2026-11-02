@@ -10,6 +10,7 @@ import java.util.function.BooleanSupplier;
 /**
  * Tests with no GUI. Run with: make test
  *
+ *   Part 0  DoorTwin's sensors (the simulation is stepped by hand, so no waiting).
  *   Part 1  DoorManager's rules, using a fake door we control by hand (no bus, no sockets).
  *   Part 2  The same messages as 8-byte bus messages, still in memory.
  *   Part 3  The whole chain over the real T03 Software Bus (skipped if no bus on localhost:6000).
@@ -47,11 +48,46 @@ public class DoorTest {
     }
 
     public static void main(String[] args) throws Exception {
+        sensors();
         rules();
         messages();
         overTheBus();
         System.out.println(failures == 0 ? "\nALL PASSED" : "\n" + failures + " FAILED");
         System.exit(failures == 0 ? 0 : 1);
+    }
+
+    //part 0: sensors
+
+    static void sensors() {
+        System.out.println("Part 0: door sensors");
+        DoorTwin t = new DoorTwin(1);
+        check("starts closed: middle sensor on, end sensors off",
+                t.isClosedSensor() && !t.isOpenLeftSensor() && !t.isOpenRightSensor() && t.isFullyClosed());
+
+        t.open();
+        t.update(2.0);                                      // part way (the door takes 5 seconds)
+        check("part way open: no end sensor and not the middle one",
+                !t.isClosedSensor() && !t.isOpenLeftSensor() && !t.isOpenRightSensor());
+        check("part way open: neither fully open nor fully closed", !t.isFullyOpen() && !t.isFullyClosed());
+
+        t.update(4.0);                                      // past the end
+        check("fully open: both end sensors on, middle off",
+                t.isOpenLeftSensor() && t.isOpenRightSensor() && !t.isClosedSensor() && t.isFullyOpen());
+
+        t.close();
+        check("closing: the end sensors let go at once", !t.isOpenLeftSensor() && !t.isOpenRightSensor() && !t.isFullyOpen());
+        t.update(6.0);
+        check("fully closed again: middle sensor on", t.isClosedSensor() && t.isFullyClosed());
+
+        check("nothing in the way: no obstruction", !t.hasObstruction());
+        t.placeObjectInDoorway(true);
+        check("object in the doorway: the beam sensor detects it", t.isBeamBroken() && !t.isSillLoaded() && t.hasObstruction());
+        t.placeObjectInDoorway(false);
+        t.placeObjectOnSill(true);
+        check("object on the sill: the sill sensor detects it", t.isSillLoaded() && !t.isBeamBroken() && t.hasObstruction());
+        t.placeObjectOnSill(false);
+        check("object removed: clear again", !t.hasObstruction());
+        t.stop();
     }
 
     //part 1: rules

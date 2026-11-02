@@ -159,7 +159,7 @@ public class Main {
                 waitFor(() -> blocked == 1, 15000);
             } else {
                 Thread.sleep(HALF_WAY_MS);        // let the door close about half way so it is visible
-                twin.setBeamBroken(true);
+                twin.placeObjectInDoorway(true);
             }
             reversed = waitFor(() -> state == 1 || state == 2, 3000);
             if (!reversed && client && attempt < 3) {
@@ -222,7 +222,7 @@ public class Main {
      */
     static void sensor(boolean block) throws Exception {
         if (!client) {
-            twin.setBeamBroken(block);
+            twin.placeObjectInDoorway(block);
             waitFor(() -> blocked == (block ? 1 : 0));
             return;
         }
