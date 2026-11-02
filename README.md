@@ -55,7 +55,9 @@ make compile     # compile all source files
 
 # Start the T03 Software Bus first (in the T03 repo): SBMain 6000
 make test        # tests with no GUI: rules + messages (+ the real bus if it is running)
-make cli         # test harness: walks through the obstruction and close tests over the bus
+make cli         # test harness: its own door + the 7 test cases, all over the bus
+# GUI demo: start the bus, then `make sim`, then:
+#   java -cp out Main --client     (same tests, driving the door in the GUI)
 make sim         # JavaFX GUI
 ```
 
@@ -87,7 +89,7 @@ Topics 8 and 9 are Team 01's own numbers and are **not yet in the shared T03 top
 2. Close requested while blocked: ignored.
 3. Open requested while closing: reverse and open.
 4. Open while already open or opening, or close while already closed or closing: nothing happens.
-5. Open for 5 seconds with nothing in the way: close by itself (the wait restarts while blocked;
+5. Open for a while (10 seconds by default) with nothing in the way: close by itself (the wait restarts while blocked;
    the time is a constructor argument, and 0 turns auto-close off).
 
 **Starting the door side**

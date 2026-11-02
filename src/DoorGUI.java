@@ -56,7 +56,7 @@ public class DoorGUI extends Application {
                 obstruction ? Color.RED : Color.GREEN
         );
 
-        beamButton.setText(twin.isBeamBroken() ? "Light SENSOR: BROKEN" : "Light SENSOR: clear");
+        beamButton.setText(twin.isBeamBroken() ? "Beam Sensor: BROKEN" : "Beam Sensor: clear");
         sillButton.setText(twin.isSillLoaded() ? "Sill Sensor: LOADED" : "Sill Sensor: clear");
     }
 
@@ -94,7 +94,7 @@ public class DoorGUI extends Application {
         StackPane.setAlignment(sidePanel, Pos.TOP_LEFT);
         root.getChildren().add(sidePanel);
 
-        beamButton = new Button("Light Curtain: clear");
+        beamButton = new Button("Beam Sensor: clear");
         beamButton.setPrefSize(200, 25);
         StackPane.setAlignment(beamButton, Pos.TOP_LEFT);
         beamButton.setTranslateX(50);

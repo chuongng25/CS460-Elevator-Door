@@ -23,10 +23,6 @@ import java.net.Socket;
  */
 public class DoorDash {
 
-    private static final int SUBSCRIBE = 0x02;
-    private static final int GET = 0x05;
-    private static final int NO_MESSAGE = 0x06;
-
     private static final long POLL_MS = 20;
     private static final int TIMEOUT_MS = 3000; // connecting, and waiting for a GET reply
 
@@ -42,7 +38,6 @@ public class DoorDash {
     private volatile boolean running = false;
 
     public DoorDash(DoorManager manager, String host, int port) {
-        if (manager == null) throw new IllegalArgumentException("manager must not be null");
         this.manager = manager;
         this.host = host;
         this.port = port;
@@ -62,7 +57,7 @@ public class DoorDash {
             socket = s;
             in = new DataInputStream(s.getInputStream());
             out = s.getOutputStream();
-            write(DoorBus.encode(SUBSCRIBE, DoorBus.TOPIC_DOOR_COMMAND, manager.getCarId()));
+            write(DoorBus.encode(DoorBus.SUBSCRIBE, DoorBus.TOPIC_DOOR_COMMAND, manager.getCarId()));
         } catch (IOException e) {
             try {
                 s.close();
@@ -96,10 +91,6 @@ public class DoorDash {
         }
     }
 
-    public boolean isConnected() {
-        return running && socket != null && !socket.isClosed();
-    }
-
     /** The manager's outgoing messages end up here. */
     private void send(byte[] message) {
         try {
@@ -120,7 +111,7 @@ public class DoorDash {
         try {
             while (running) {
                 byte[] message;
-                while (running && (message = get(DoorBus.TOPIC_DOOR_COMMAND)) != null) {
+                while (running && (message = get()) != null) {
                     manager.onMessage(message);
                 }
                 Thread.sleep(POLL_MS);
@@ -132,11 +123,11 @@ public class DoorDash {
     }
 
     /** Takes the oldest waiting message for this car, or null if there is none. */
-    private byte[] get(int topic) throws IOException {
-        write(DoorBus.encode(GET, topic, manager.getCarId()));
+    private byte[] get() throws IOException {
+        write(DoorBus.encode(DoorBus.GET, DoorBus.TOPIC_DOOR_COMMAND, manager.getCarId()));
         byte[] reply = new byte[DoorBus.SIZE];
         in.readFully(reply);
-        return (reply[0] & 0xFF) == NO_MESSAGE ? null : reply;
+        return (reply[0] & 0xFF) == DoorBus.NO_MESSAGE ? null : reply;
     }
 
     private void fail(String reason) {

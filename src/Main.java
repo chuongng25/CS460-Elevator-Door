@@ -16,49 +16,70 @@ import java.util.function.BooleanSupplier;
  *   6. Open while closing: the door reverses
  *   7. Auto-close after the door has been open for a while
  *
- *   java Main [host] [port]     (defaults: localhost 6000; the Software Bus must be running)
+ *   java Main [host] [port]            Runs its own door (no window) plus the tests.
+ *   java Main --client [host] [port]   Tests only. Uses the door in the GUI, so start the Software
+ *                                      Bus first, then the GUI (make sim), then this. The sensor
+ *                                      steps ask you to click the GUI's sensor button.
+ *
+ * Defaults: localhost 6000. The Software Bus must be running.
  */
 public class Main {
 
     static final int CAR = 1;
-    static final double HOLD_SEC = 3.0;   // door stays open this long before closing itself
+    static final double HOLD_SEC = 8.0;   // door stays open this long before closing itself
     static int failed = 0;
+    static final long PAUSE_MS = 2500;    // pause before each test so the demo is easy to follow
+    static final long HALF_WAY_MS = 2500; // about half of the 5 seconds the door takes to close
+    static final long STEP_MS = 1000;     // pause between the numbered steps of tests 1 and 2
     static final String[] STATE = {"CLOSED", "OPENING", "OPEN", "CLOSING"};
 
     static volatile int state = -1;       // last DOOR_STATE read from the bus
     static volatile int blocked = -1;     // last DOOR_OBSTRUCTION read from the bus
-    static volatile byte[] lastMsg;       // last raw message read from the bus
+    static volatile byte[] obstructionMsg; // last DOOR_OBSTRUCTION message read from the bus
     static OutputStream out;
+    static boolean client = false;        // --client: the door lives in the GUI, not in this program
+    static DoorTwin twin;                 // our own door (not used with --client)
 
     public static void main(String[] args) throws Exception {
-        String host = args.length > 0 ? args[0] : "localhost";
-        int port = args.length > 1 ? Integer.parseInt(args[1]) : 6000;
+        java.util.List<String> rest = new java.util.ArrayList<>();
+        for (String a : args) {
+            if (a.equals("--client")) client = true; else rest.add(a);
+        }
+        String host = rest.size() > 0 ? rest.get(0) : "localhost";
+        int port = rest.size() > 1 ? Integer.parseInt(rest.get(1)) : 6000;
 
         // door side: the door (simulated), the brain, and the bus connection
-        DoorTwin twin = new DoorTwin(CAR);
-        DoorApi door = new LoggingDoor(twin);
-        DoorManager manager = new DoorManager(door, CAR, HOLD_SEC);
-        manager.start();
-        DoorDash dash = new DoorDash(manager, host, port);
-        dash.start();
+        DoorApi door = null;
+        DoorManager manager = null;
+        DoorDash dash = null;
+        if (client) {
+            System.out.println("Client mode: using the door in the GUI.");
+        } else {
+            twin = new DoorTwin(CAR);
+            door = twin;
+            manager = new DoorManager(door, CAR, HOLD_SEC);
+            manager.start();
+            dash = new DoorDash(manager, host, port);
+            dash.start();
+        }
 
         // test side: its own connection to the bus
         Socket socket = new Socket(host, port);
         out = socket.getOutputStream();
         DataInputStream in = new DataInputStream(socket.getInputStream());
-        send(DoorBus.encode(0x02, DoorBus.TOPIC_DOOR_STATE, CAR));          // subscribe
-        send(DoorBus.encode(0x02, DoorBus.TOPIC_DOOR_OBSTRUCTION, CAR));
+        send(DoorBus.encode(DoorBus.SUBSCRIBE, DoorBus.TOPIC_DOOR_STATE, CAR));          // subscribe
+        send(DoorBus.encode(DoorBus.SUBSCRIBE, DoorBus.TOPIC_DOOR_OBSTRUCTION, CAR));
         Thread reader = new Thread(() -> {
             try {
                 while (true) {
                     for (int topic : new int[]{DoorBus.TOPIC_DOOR_STATE, DoorBus.TOPIC_DOOR_OBSTRUCTION}) {
-                        send(DoorBus.encode(0x05, topic, CAR));              // ask the bus for news
+                        send(DoorBus.encode(DoorBus.GET, topic, CAR));              // ask the bus for news
                         byte[] msg = new byte[DoorBus.SIZE];
                         in.readFully(msg);
-                        if (msg[0] == 0x06) continue;                        // nothing new
-                        lastMsg = msg;
+                        if (msg[0] == DoorBus.NO_MESSAGE) continue;                        // nothing new
                         int v = (int) DoorBus.value(msg);
-                        if (topic == DoorBus.TOPIC_DOOR_STATE) state = v; else blocked = v;
+                        if (topic == DoorBus.TOPIC_DOOR_STATE) state = v;
+                        else { blocked = v; obstructionMsg = msg; }
                     }
                     Thread.sleep(20);
                 }
@@ -71,7 +92,8 @@ public class Main {
 
         // get the door open first so there is something to close
         if (!waitFor(() -> state >= 0)) {
-            System.out.println("No status from the door side - is the bus running?");
+            System.out.println("No status from the door side - is the bus running"
+                    + (client ? " and the GUI started?" : "?"));
             System.exit(1);
         }
         System.out.println("Setup: opening the door");
@@ -80,72 +102,102 @@ public class Main {
         System.out.println("   door is OPEN\n");
 
         //test 1: obstruction
-        System.out.println("TEST 1: obstruction");
-        twin.setBeamBroken(true);
-        System.out.println("   1. door side: hasObstruction() = " + door.hasObstruction());
+        pause(); System.out.println("TEST 1: obstruction");
+        sensor(true);
+        System.out.println(client ? "   1. sensor tripped in the GUI"
+                                  : "   1. door side: hasObstruction() = " + door.hasObstruction());
+        Thread.sleep(STEP_MS);
         System.out.println("   2. door side published DOOR_OBSTRUCTION on the bus");
+        Thread.sleep(STEP_MS);
         waitFor(() -> blocked == 1);
-        System.out.println("   3. read from the bus: " + Arrays.toString(lastMsg) + "  (DOOR_OBSTRUCTION = " + blocked + ")");
+        System.out.println("   3. read from the bus: " + Arrays.toString(obstructionMsg) + "  (DOOR_OBSTRUCTION = " + blocked + ")");
+        Thread.sleep(STEP_MS);
         System.out.println("   4. terminal: OBSTRUCTION DETECTED\n");
-        twin.setBeamBroken(false);
+        Thread.sleep(STEP_MS);
+        sensor(false);
         waitFor(() -> blocked == 0);
 
         //test 2: close the door
-        System.out.println("TEST 2: close the door");
+        pause(); System.out.println("TEST 2: close the door");
         byte[] close = DoorBus.encode(DoorBus.TOPIC_DOOR_COMMAND, CAR, 0);
         System.out.println("   1. published the command on the bus: " + Arrays.toString(close) + "  (DOOR_COMMAND = close)");
+        Thread.sleep(STEP_MS);
         send(close);
         System.out.println("   2. door side read the command from the bus");
+        Thread.sleep(STEP_MS);
         waitFor(() -> state == 3);                                           // CLOSING seen on the bus
         waitFor(() -> state == 0);
         System.out.println("   4. read from the bus: DOOR_STATE = " + STATE[state] + "\n");
+        Thread.sleep(STEP_MS);
 
         //test 3: open
-        System.out.println("TEST 3: open the door");
+        pause(); System.out.println("TEST 3: open the door");
         command(true);
         check("door opens", waitFor(() -> state == 2));
         System.out.println();
 
         //test 4: close is ignored while blocked
-        System.out.println("TEST 4: close is ignored while the doorway is blocked");
-        twin.setBeamBroken(true);
-        waitFor(() -> blocked == 1);
+        pause(); System.out.println("TEST 4: close is ignored while the doorway is blocked");
+        sensor(true);
         command(false);
         Thread.sleep(1000);
         check("door stays OPEN", state == 2);
-        twin.setBeamBroken(false);
-        waitFor(() -> blocked == 0);
+        sensor(false);
         System.out.println();
 
         //test 5: blocked while closing -> reopen
-        System.out.println("TEST 5: blocked while closing, the door reopens");
-        command(false);
-        check("door starts closing", waitFor(() -> state == 3));
-        twin.setBeamBroken(true);
-        check("door reverses", waitFor(() -> state == 1 || state == 2));
-        twin.setBeamBroken(false);
+        pause(); System.out.println("TEST 5: blocked while closing, the door reopens");
+        boolean closing = false, reversed = false;
+        for (int attempt = 1; attempt <= (client ? 3 : 1) && !reversed; attempt++) {
+            if (client) {
+                System.out.println("   >>> Get ready" + (attempt > 1 ? " (try " + attempt + " of 3)" : "")
+                        + ": click the Beam Sensor button as soon as the door starts closing. You have about 5 seconds.");
+            }
+            command(false);
+            closing = waitFor(() -> state == 3);
+            if (client) {
+                waitFor(() -> blocked == 1, 15000);
+            } else {
+                Thread.sleep(HALF_WAY_MS);        // let the door close about half way so it is visible
+                twin.setBeamBroken(true);
+            }
+            reversed = waitFor(() -> state == 1 || state == 2, 3000);
+            if (!reversed && client && attempt < 3) {
+                System.out.println("   Too slow, the door finished closing first. Clearing and trying again.");
+                sensor(false);
+                command(true);
+                waitFor(() -> state == 2);
+            }
+        }
+        check("door starts closing", closing);
+        check("door reverses", reversed);
+        sensor(false);
         check("door ends fully open", waitFor(() -> state == 2));
         System.out.println();
 
         //test 6: open while closing -> reverse
-        System.out.println("TEST 6: open while closing, the door reverses");
+        pause(); System.out.println("TEST 6: open while closing, the door reverses");
         command(false);
         check("door starts closing", waitFor(() -> state == 3));
+        Thread.sleep(HALF_WAY_MS);        // let the door close about half way so it is visible
         command(true);
         check("door reverses", waitFor(() -> state == 1 || state == 2));
         check("door ends fully open", waitFor(() -> state == 2));
         System.out.println();
 
         //test 7: auto-close
-        System.out.println("TEST 7: auto-close (waiting about " + (int) HOLD_SEC + " seconds, no command sent)");
+        pause(); System.out.println(client ? "TEST 7: auto-close (waiting for the GUI door to close itself, no command sent)"
+                                  : "TEST 7: auto-close (waiting about " + (int) HOLD_SEC + " seconds, no command sent)");
         check("door closes by itself", waitFor(() -> state == 0));
         System.out.println();
 
         System.out.println(failed == 0 ? "ALL TESTS PASSED" : failed + " CHECK(S) FAILED");
         socket.close();
-        dash.stop();
-        manager.stop();
-        twin.stop();
+        if (!client) {
+            dash.stop();
+            manager.stop();
+            twin.stop();
+        }
         System.exit(failed == 0 ? 0 : 1);
     }
 
@@ -160,9 +212,40 @@ public class Main {
         if (!ok) failed++;
     }
 
-    /** Waits up to 10 seconds. */
+    static void pause() throws InterruptedException {
+        Thread.sleep(PAUSE_MS);
+    }
+
+    /**
+     * Blocks or clears the doorway. With our own door that is one call. With --client the door is in
+     * the GUI, so we ask you to click its sensor button and wait until the bus reports the change.
+     */
+    static void sensor(boolean block) throws Exception {
+        if (!client) {
+            twin.setBeamBroken(block);
+            waitFor(() -> blocked == (block ? 1 : 0));
+            return;
+        }
+        System.out.println("   >>> click the Beam Sensor button to " + (block ? "BLOCK" : "CLEAR")
+                + " the doorway. Waiting...");
+        if (!waitFor(() -> blocked == (block ? 1 : 0), 60000)) {
+            System.out.println("   Nothing changed on the bus after 60 seconds.");
+            System.exit(1);
+        }
+        if (block && state == 0) {                       // the door closed itself while we waited
+            System.out.println("   (the door had closed itself, reopening it)");
+            command(true);
+            waitFor(() -> state == 2);
+        }
+    }
+
+    /** Waits up to 20 seconds. */
     static boolean waitFor(BooleanSupplier cond) throws InterruptedException {
-        long end = System.currentTimeMillis() + 10000;
+        return waitFor(cond, 20000);
+    }
+
+    static boolean waitFor(BooleanSupplier cond, long ms) throws InterruptedException {
+        long end = System.currentTimeMillis() + ms;
         while (!cond.getAsBoolean() && System.currentTimeMillis() < end) Thread.sleep(20);
         return cond.getAsBoolean();
     }
@@ -170,16 +253,5 @@ public class Main {
     static synchronized void send(byte[] msg) throws java.io.IOException {
         out.write(msg);
         out.flush();
-    }
-
-    /** Wraps the door and prints when the manager moves it. Everything else passes straight through. */
-    static class LoggingDoor implements DoorApi {
-        private final DoorApi door;
-        LoggingDoor(DoorApi door) { this.door = door; }
-        public void open()  { System.out.println("   -> door side calls door.open()");  door.open(); }
-        public void close() { System.out.println("   3. door side calls door.close()"); door.close(); }
-        public boolean isFullyOpen()    { return door.isFullyOpen(); }
-        public boolean isFullyClosed()  { return door.isFullyClosed(); }
-        public boolean hasObstruction() { return door.hasObstruction(); }
     }
 }

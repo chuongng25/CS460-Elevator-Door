@@ -12,9 +12,6 @@
  *   7  DOOR_STATE        DoorManager -> bus   body 0 closed, 1 opening, 2 open, 3 closing
  *   8  DOOR_COMMAND      bus -> DoorManager   body 1 = open, 0 = close
  *   9  DOOR_OBSTRUCTION  DoorManager -> bus   body 1 = blocked, 0 = clear
- *
- * What the transport must deliver to DoorManager.onMessage() for its car number:
- *   topic 8 (DOOR_COMMAND)
  */
 public final class DoorBus {
 
@@ -23,6 +20,11 @@ public final class DoorBus {
     public static final int TOPIC_DOOR_OBSTRUCTION = 9;
 
     public static final int SIZE = 8;
+
+    // T03 bus requests: the first byte of the message is the request, not a topic.
+    public static final int SUBSCRIBE = 0x02;   // [0x02][topic][0 0 0 0 0 subtopic]  no reply
+    public static final int GET = 0x05;         // [0x05][topic][0 0 0 0 0 subtopic]  reply: a message, or NO_MESSAGE
+    public static final int NO_MESSAGE = 0x06;  // first byte of the reply when nothing is waiting
     private static final long MAX_VALUE = (1L << 48) - 1;
 
     private DoorBus() {
@@ -54,19 +56,11 @@ public final class DoorBus {
         return wire;
     }
 
-    private static void check(byte[] message) {
-        if (message == null || message.length != SIZE) {
-            throw new IllegalArgumentException("message must be " + SIZE + " bytes");
-        }
-    }
-
     public static int topic(byte[] message) {
-        check(message);
         return message[0] & 0xFF;
     }
 
     public static int subtopic(byte[] message) {
-        check(message);
         return message[1] & 0xFF;
     }
 
@@ -74,7 +68,6 @@ public final class DoorBus {
      * The 6-byte body read as a big-endian unsigned number.
      */
     public static long value(byte[] message) {
-        check(message);
         long v = 0;
         for (int i = 2; i < SIZE; i++) {
             v = (v << 8) | (message[i] & 0xFF);

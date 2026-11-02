@@ -7,7 +7,7 @@ public class DoorTwin implements DoorApi {
     //distance a door panel can travel to fully open/shut. UPDATE USE ONLY IF SPEED CHANGES AND UPDATE DDS
     public static final double DOOR_TRAVEL = 2.0;
     //speed is 1 foot per second per panel. UPDATE USE ONLY IF SPEED CHANGES AND UPDATE DDS
-    public static final double DOOR_SPEED_FPS = 1.0;
+    public static final double DOOR_SPEED_FPS = 0.4;
     //time it takes to open/close a door fully. will be used later for updating GUI
     public static final double DEFAULT_DURATION_SEC = DOOR_TRAVEL/DOOR_SPEED_FPS;
     //Twin threads clock for changing positition

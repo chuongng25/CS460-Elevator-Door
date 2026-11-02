@@ -21,7 +21,7 @@ public class DoorManager {
     /** What the door is doing. The order matches the values sent in DOOR_STATE (see DoorBus). */
     public enum State { CLOSED, OPENING, OPEN, CLOSING }
 
-    public static final double DEFAULT_HOLD_SEC = 5.0;
+    public static final double DEFAULT_HOLD_SEC = 10.0;
 
     private static final long TICK_MS = 50;       // how often the sensors are checked
     private static final long RESEND_STATUS_MS = 500; // status is re-sent this often (the bus keeps no history)

@@ -181,15 +181,15 @@ public class DoorTest {
 
         OutputStream out = s.getOutputStream();
         DataInputStream in = new DataInputStream(s.getInputStream());
-        out.write(DoorBus.encode(0x02, DoorBus.TOPIC_DOOR_STATE, 1));          // subscribe to door state
+        out.write(DoorBus.encode(DoorBus.SUBSCRIBE, DoorBus.TOPIC_DOOR_STATE, 1));          // subscribe to door state
         int[] state = {-1};
         Thread t = new Thread(() -> {
             try {
                 while (true) {
-                    out.write(DoorBus.encode(0x05, DoorBus.TOPIC_DOOR_STATE, 1));   // ask for news
+                    out.write(DoorBus.encode(DoorBus.GET, DoorBus.TOPIC_DOOR_STATE, 1));   // ask for news
                     byte[] msg = new byte[DoorBus.SIZE];
                     in.readFully(msg);
-                    if (msg[0] != 0x06) state[0] = (int) DoorBus.value(msg);
+                    if (msg[0] != DoorBus.NO_MESSAGE) state[0] = (int) DoorBus.value(msg);
                     Thread.sleep(20);
                 }
             } catch (Exception ignored) { }
@@ -199,9 +199,9 @@ public class DoorTest {
 
         check("status arrives over the bus (CLOSED)", waitFor(() -> state[0] == 0, 3000));
         out.write(DoorBus.encode(DoorBus.TOPIC_DOOR_COMMAND, 1, 1));            // open
-        check("OPEN command over the bus -> door OPEN", waitFor(() -> state[0] == 2, 5000));
+        check("OPEN command over the bus -> door OPEN", waitFor(() -> state[0] == 2, 12000));
         out.write(DoorBus.encode(DoorBus.TOPIC_DOOR_COMMAND, 1, 0));            // close
-        check("CLOSE command over the bus -> door CLOSED", waitFor(() -> state[0] == 0, 5000));
+        check("CLOSE command over the bus -> door CLOSED", waitFor(() -> state[0] == 0, 12000));
 
         s.close();
         dash.stop();
