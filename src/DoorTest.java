@@ -54,7 +54,7 @@ public class DoorTest {
         System.exit(failures == 0 ? 0 : 1);
     }
 
-    // ------------------------------------------------------------ part 1: rules
+    //part 1: rules
 
     static void rules() {
         System.out.println("Part 1: door rules");
@@ -124,7 +124,7 @@ public class DoorTest {
         m.stop();
     }
 
-    // ---------------------------------------------------- part 2: bus messages
+    // part 2: bus messages
 
     static void messages() {
         System.out.println("Part 2: 8-byte bus messages (in memory)");
@@ -162,7 +162,7 @@ public class DoorTest {
         return -1;
     }
 
-    // ------------------------------------------------- part 3: real Software Bus
+    //part 3: real Software Bus
 
     static void overTheBus() throws Exception {
         System.out.println("Part 3: over the real Software Bus (localhost:6000)");

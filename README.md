@@ -16,7 +16,7 @@ src/
 ├── DoorDash.java      # Transport: the one socket to the T03 Software Bus, delivers messages both ways
 ├── DoorTwin.java      # Hardware Twin: simulated door (implements DoorApi, makes no decisions)
 ├── DoorGUI.java       # View: JavaFX graphical simulation & manual diagnostic buttons
-└── Main.java          # Demo: runs the door side and sends open/close over the bus
+└── Main.java          # Test harness: runs the door side and the obstruction + close tests over the bus
 ```
 
 ---
@@ -55,7 +55,7 @@ make compile     # compile all source files
 
 # Start the T03 Software Bus first (in the T03 repo): SBMain 6000
 make test        # tests with no GUI: rules + messages (+ the real bus if it is running)
-make cli         # demo: door side + a menu that sends open/close over the bus
+make cli         # test harness: walks through the obstruction and close tests over the bus
 make sim         # JavaFX GUI
 ```
 
