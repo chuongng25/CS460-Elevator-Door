@@ -9,6 +9,7 @@ public final class CCBus {
     public static final int GOTO = 25;
     public static final int CLEAR = 26;
     public static final int RESET = 27;
+    public static final int OVERWEIGHT = 28;
 
     public static final int IDLE = 0;
     public static final int UP = 1;
