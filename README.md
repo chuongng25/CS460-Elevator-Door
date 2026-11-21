@@ -24,7 +24,7 @@ src/
 ## 2. System Invariants (Strict Rules)
 
 1. **Flat Structure Invariant (No File Bloat)**:
-   - Keep all code strictly inside the flat `src/` directory.
+   - Keep all Door Assembly code strictly inside the flat `src/` directory.
    - **DO NOT** create nested packages (e.g. `elevator/door/view`), speculative helpers, or unnecessary wrapper classes.
    - Any new functionality must fit cleanly into the existing 7 core files unless explicitly requested (DoorBus.java and DoorDash.java were added on request for the Software Bus).
 
@@ -107,3 +107,13 @@ Notes:
   the door's status every 500 ms; a program that connects late catches up within that time.
 - The manager only knows what `DoorApi` reports (fully open, fully closed, blocked), so it
   remembers which way it last sent the door to tell opening from closing.
+
+## 5. Control Center prototype
+
+From the repository root, run `make cc-compile` to build `control-center/src` and its
+shared `DoorBus.java` dependency into `out/control-center`. This build does not use JavaFX.
+
+`ButtonSim` publishes test inputs and `CCDash` logs incoming events. There is no
+Control Center Manager or dispatch loop yet. The prototype uses the older bus
+request codes and project-local topic numbers; the current T03 protocol and
+message catalog are not yet supported.

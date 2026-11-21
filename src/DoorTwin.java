@@ -20,11 +20,15 @@ public class DoorTwin implements DoorApi {
     //fully closed position is 0 (1 is open)
     private double position = 0.0;
 
-    //The two sensors we have to have. beambroken checks if
-    //something is in the opening. the silloaded is for if someone is standing in
-    //the doorway. so one covers above one below kinda ish.
-    private boolean beamBroken = false;
-    private boolean sillLoaded = false;
+    //Objects that can be in the way. Nothing sets a sensor directly: the beam sensor
+    //detects an object in the doorway and the sill sensor detects one on the floor strip.
+    private boolean objectInDoorway = false;
+    private boolean objectOnSill = false;
+
+    //Position sensors, like limit switches. They switch on by themselves when the door gets there.
+    private boolean closedSensor = true;       //middle: the two panels meet
+    private boolean openLeftSensor = false;    //left end: the left panel is fully open
+    private boolean openRightSensor = false;   //right end: the right panel is fully open
     //handles the thread that moves the door 20 timees a second.
     private Thread ticker;
     //checks if the twin thread is still going
@@ -84,48 +88,80 @@ public class DoorTwin implements DoorApi {
                 state = State.CLOSED;
             }
         }
+        updateSensors();
+    }
+
+    //A switch lets go as soon as the door starts to move away from it.
+    private void updateSensors() {
+        closedSensor = position <= 0.0 && state != State.OPENING;
+        openLeftSensor = position >= 1.0 && state != State.CLOSING;
+        openRightSensor = position >= 1.0 && state != State.CLOSING;
     }
 
     public synchronized void open() {
         if (state != State.OPEN) {
             state = State.OPENING;
+            updateSensors();
         }
     }
 
     public synchronized void close() {
         if (state != State.CLOSED) {
             state = State.CLOSING;
+            updateSensors();
         }
     }
 
+    //what DoorApi reports comes only from the sensors
     public synchronized boolean isFullyOpen() {
-        return position >= 1.0 && state == State.OPEN;
+        return openLeftSensor && openRightSensor;
     }
 
     public synchronized boolean isFullyClosed() {
-        return position <= 0.0 && state == State.CLOSED;
+        return closedSensor;
     }
 
     public synchronized boolean hasObstruction() {
-        return beamBroken || sillLoaded;
+        return isBeamBroken() || isSillLoaded();
     }
 
-    //sensor only. the DoorManager decides what to do about it
+    //put an object in the way, or take it away
+    public synchronized void placeObjectInDoorway(boolean present) {
+        objectInDoorway = present;
+    }
+
+    public synchronized void placeObjectOnSill(boolean present) {
+        objectOnSill = present;
+    }
+
+    //the GUI still calls these two names
     public synchronized void setBeamBroken(boolean broken) {
-        this.beamBroken = broken;
+        placeObjectInDoorway(broken);
     }
 
-    //sensor only. the DoorManager decides what to do about it
     public synchronized void setSillLoaded(boolean loaded) {
-        this.sillLoaded = loaded;
+        placeObjectOnSill(loaded);
     }
 
+    //the sensors
     public synchronized boolean isBeamBroken() {
-        return beamBroken;
+        return objectInDoorway;
     }
 
     public synchronized boolean isSillLoaded() {
-        return sillLoaded;
+        return objectOnSill;
+    }
+
+    public synchronized boolean isClosedSensor() {
+        return closedSensor;
+    }
+
+    public synchronized boolean isOpenLeftSensor() {
+        return openLeftSensor;
+    }
+
+    public synchronized boolean isOpenRightSensor() {
+        return openRightSensor;
     }
 
     public synchronized double getPosition() {

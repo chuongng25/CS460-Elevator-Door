@@ -20,14 +20,19 @@ JAVAFX_LIB ?= $(firstword $(wildcard \
 ))
 
 SRCS = $(shell find src -name "*.java")
+CC_SRCS = src/DoorBus.java $(wildcard control-center/src/*.java)
 
-.PHONY: all sim test cli compile clean
+.PHONY: all sim test cli compile cc-compile clean
 
 all: cli
 
 compile:
 	@mkdir -p $(OUT)
 	@$(JAVAC) -d $(OUT) --module-path "$(JAVAFX_LIB)" --add-modules $(MODULES) $(SRCS)
+
+cc-compile:
+	@mkdir -p $(OUT)/control-center
+	@$(JAVAC) -d $(OUT)/control-center $(CC_SRCS)
 
 cli: compile
 	@$(JAVA) -cp $(OUT) Main

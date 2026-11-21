@@ -19,7 +19,7 @@ import java.util.function.BooleanSupplier;
  *   java Main [host] [port]            Runs its own door (no window) plus the tests.
  *   java Main --client [host] [port]   Tests only. Uses the door in the GUI, so start the Software
  *                                      Bus first, then the GUI (make sim), then this. The sensor
- *                                      steps ask you to click the GUI's sensor button.
+ *                                      steps ask you to click the GUI's Obstruction Sensor button.
  *
  * Defaults: localhost 6000. The Software Bus must be running.
  */
@@ -150,8 +150,8 @@ public class Main {
         boolean closing = false, reversed = false;
         for (int attempt = 1; attempt <= (client ? 3 : 1) && !reversed; attempt++) {
             if (client) {
-                System.out.println("   >>> Get ready" + (attempt > 1 ? " (try " + attempt + " of 3)" : "")
-                        + ": click the Beam Sensor button as soon as the door starts closing. You have about 5 seconds.");
+                System.out.println("   >>> ok get ready" + (attempt > 1 ? " (try " + attempt + " of 3, almost there lol)" : "")
+                        + ": click the Obstruction Sensor button the second the door starts closing, you got like 5 sec");
             }
             command(false);
             closing = waitFor(() -> state == 3);
@@ -159,7 +159,7 @@ public class Main {
                 waitFor(() -> blocked == 1, 15000);
             } else {
                 Thread.sleep(HALF_WAY_MS);        // let the door close about half way so it is visible
-                twin.setBeamBroken(true);
+                twin.placeObjectInDoorway(true);
             }
             reversed = waitFor(() -> state == 1 || state == 2, 3000);
             if (!reversed && client && attempt < 3) {
@@ -218,18 +218,18 @@ public class Main {
 
     /**
      * Blocks or clears the doorway. With our own door that is one call. With --client the door is in
-     * the GUI, so we ask you to click its sensor button and wait until the bus reports the change.
+     * the GUI, so we ask you to click its Obstruction Sensor button and wait until the bus reports the change.
      */
     static void sensor(boolean block) throws Exception {
         if (!client) {
-            twin.setBeamBroken(block);
+            twin.placeObjectInDoorway(block);
             waitFor(() -> blocked == (block ? 1 : 0));
             return;
         }
-        System.out.println("   >>> click the Beam Sensor button to " + (block ? "BLOCK" : "CLEAR")
-                + " the doorway. Waiting...");
+        System.out.println("   >>> click the Obstruction Sensor button to " + (block ? "block" : "clear")
+                + " the door. waiting for you...");
         if (!waitFor(() -> blocked == (block ? 1 : 0), 60000)) {
-            System.out.println("   Nothing changed on the bus after 60 seconds.");
+            System.out.println("  nothing changed on the bus after 60 sec, did you click it?");
             System.exit(1);
         }
         if (block && state == 0) {                       // the door closed itself while we waited
